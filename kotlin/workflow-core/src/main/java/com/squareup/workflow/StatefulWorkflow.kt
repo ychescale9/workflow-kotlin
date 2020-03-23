@@ -433,9 +433,9 @@ inline fun <StateT, OutputT : Any, RenderingT> Workflow.Companion.stateful(
  */
 fun <PropsT, StateT, OutputT : Any, RenderingT>
     StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.action(
-  name: String = "",
-  update: Updater<StateT, OutputT>.() -> Unit
-) = action({ name }, update)
+      name: String = "",
+      update: Updater<StateT, OutputT>.() -> Unit
+    ) = action({ name }, update)
 
 /**
  * Convenience to create a [WorkflowAction] with parameter types matching those
@@ -448,9 +448,9 @@ fun <PropsT, StateT, OutputT : Any, RenderingT>
  */
 fun <PropsT, StateT, OutputT : Any, RenderingT>
     StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.action(
-  name: () -> String,
-  update: Updater<StateT, OutputT>.() -> Unit
-): WorkflowAction<StateT, OutputT> = object : WorkflowAction<StateT, OutputT> {
+      name: () -> String,
+      update: Updater<StateT, OutputT>.() -> Unit
+    ): WorkflowAction<StateT, OutputT> = object : WorkflowAction<StateT, OutputT> {
   override fun Updater<StateT, OutputT>.apply() = update.invoke(this)
   override fun toString(): String = "action(${name()})-${this@action}"
 }
@@ -464,9 +464,9 @@ fun <PropsT, StateT, OutputT : Any, RenderingT>
 )
 fun <PropsT, StateT, OutputT : Any, RenderingT>
     StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.workflowAction(
-  name: String = "",
-  block: Mutator<StateT>.() -> OutputT?
-) = workflowAction({ name }, block)
+      name: String = "",
+      block: Mutator<StateT>.() -> OutputT?
+    ) = workflowAction({ name }, block)
 
 @Suppress("OverridingDeprecatedMember")
 @Deprecated(
@@ -478,8 +478,8 @@ fun <PropsT, StateT, OutputT : Any, RenderingT>
 )
 fun <PropsT, StateT, OutputT : Any, RenderingT>
     StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.workflowAction(
-  name: () -> String,
-  block: Mutator<StateT>.() -> OutputT?
+      name: () -> String,
+      block: Mutator<StateT>.() -> OutputT?
 ): WorkflowAction<StateT, OutputT> = object : WorkflowAction<StateT, OutputT> {
   override fun Mutator<StateT>.apply() = block.invoke(this)
   override fun toString(): String = "workflowAction(${name()})-${this@workflowAction}"
