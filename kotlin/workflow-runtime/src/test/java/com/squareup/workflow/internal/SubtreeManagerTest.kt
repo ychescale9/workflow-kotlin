@@ -17,7 +17,6 @@
 
 package com.squareup.workflow.internal
 
-import com.squareup.workflow.RenderContext
 import com.squareup.workflow.Sink
 import com.squareup.workflow.Snapshot
 import com.squareup.workflow.StatefulWorkflow
@@ -61,7 +60,7 @@ class SubtreeManagerTest {
     override fun render(
       props: String,
       state: String,
-      context: RenderContext<String, String>
+      context: RenderContext
     ): Rendering {
       val sink: Sink<String> = context.makeEventSink { setOutput(it) }
       return Rendering(props, state) { sink.send("workflow output:$it") }
@@ -84,7 +83,7 @@ class SubtreeManagerTest {
     override fun render(
       props: Unit,
       state: Unit,
-      context: RenderContext<Unit, Nothing>
+      context: RenderContext
     ) {
     }
 
