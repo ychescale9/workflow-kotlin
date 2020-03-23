@@ -36,7 +36,7 @@ internal class RealRenderTester<PropsT, StateT, OutputT : Any, RenderingT>(
   private var childWillEmitOutput: Boolean = false,
   private var processedAction: WorkflowAction<StateT, OutputT>? = null
 ) : RenderTester<PropsT, StateT, OutputT, RenderingT>,
-    RenderContext<StateT, OutputT>,
+    RenderContext<StateT, OutputT>(),
     RenderTestResult<StateT, OutputT>,
     Sink<WorkflowAction<StateT, OutputT>> {
 

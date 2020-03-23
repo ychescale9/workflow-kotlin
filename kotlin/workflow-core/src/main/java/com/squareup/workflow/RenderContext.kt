@@ -17,106 +17,10 @@
 
 package com.squareup.workflow
 
+import com.squareup.workflow.StatefulWorkflow.RenderContext
 import com.squareup.workflow.WorkflowAction.Companion.noAction
 import com.squareup.workflow.WorkflowAction.Updater
 
-/**
- * Facilities for a [Workflow] to interact with other [Workflow]s and the outside world from inside
- * a `render` function.
- *
- * ## Handling events from the UI
- *
- * While a workflow's rendering can represent whatever you need it to, it is common for the
- * rendering to contain the data for some part of your UI. In addition to shuttling data to the UI,
- * the rendering can also contain functions that the UI can call to send events to the workflow.
- *
- * E.g.
- * ```
- * data class Rendering(
- *   val radioButtonTexts: List<String>,
- *   val onSelected: (index: Int) -> Unit
- * )
- * ```
- *
- * To create populate such functions from your `render` method, you first need to define a
- * [WorkflowAction] to handle the event by changing state, emitting an output, or both. Then, just
- * pass a lambda to your rendering that instantiates the action and passes it to
- * [actionSink.send][Sink.send].
- *
- * ## Performing asynchronous work
- *
- * See [runningWorker].
- *
- * ## Composing children
- *
- * See [renderChild].
- */
-interface RenderContext<StateT, in OutputT : Any> {
-
-  /**
-   * Accepts a single [WorkflowAction], invokes that action by calling [WorkflowAction.apply]
-   * to update the current state, and optionally emits the returned output value if it is non-null.
-   *
-   * This method is defined by the [Sink] interface. Since [RenderContext] implements [Sink],
-   * operations like [contraMap] are available.
-   */
-  val actionSink: Sink<WorkflowAction<StateT, OutputT>>
-
-  @Deprecated("Use RenderContext.actionSink.")
-  fun <EventT : Any> onEvent(
-    handler: (EventT) -> WorkflowAction<StateT, OutputT>
-  ): (EventT) -> Unit
-
-  /**
-   * Creates a sink that will accept a single [WorkflowAction] of the given type.
-   * Invokes that action by calling [WorkflowAction.apply] to update the current
-   * state, and optionally emits the returned output value if it is non-null.
-   */
-  @Suppress("UNCHECKED_CAST", "DeprecatedCallableAddReplaceWith")
-  @Deprecated("Use RenderContext.actionSink.")
-  fun <A : WorkflowAction<StateT, OutputT>> makeActionSink(): Sink<A> = actionSink
-
-  /**
-   * Ensures [child] is running as a child of this workflow, and returns the result of its
-   * `render` method.
-   *
-   * **Never call [StatefulWorkflow.render] or [StatelessWorkflow.render] directly, always do it
-   * through this context method.**
-   *
-   * 1. If the child _wasn't_ already running, it will be started either from
-   *    [initialState][Workflow.initialState] or its snapshot.
-   * 2. If the child _was_ already running, The workflow's
-   *    [onInputChanged][StatefulWorkflow.onInputChanged] method is invoked with the previous input
-   *    and this one.
-   * 3. The child's `render` method is invoked with `input` and the child's state.
-   *
-   * After this method returns, if something happens that trigger's one of `child`'s handlers, and
-   * that handler emits an output, the function passed as [handler] will be invoked with that
-   * output.
-   *
-   * @param key An optional string key that is used to distinguish between workflows of the same
-   * type.
-   */
-  fun <ChildPropsT, ChildOutputT : Any, ChildRenderingT> renderChild(
-    child: Workflow<ChildPropsT, ChildOutputT, ChildRenderingT>,
-    props: ChildPropsT,
-    key: String = "",
-    handler: (ChildOutputT) -> WorkflowAction<StateT, OutputT>
-  ): ChildRenderingT
-
-  /**
-   * Ensures [worker] is running. When the [Worker] emits an output, [handler] is called
-   * to determine the [WorkflowAction] to take. When the worker finishes, nothing happens (although
-   * another render pass may be triggered).
-   *
-   * @param key An optional string key that is used to distinguish between identical [Worker]s.
-   */
-  fun <T> runningWorker(
-    worker: Worker<T>,
-    key: String = "",
-    handler: (T) -> WorkflowAction<StateT, OutputT>
-  )
-}
 
 /**
  * Convenience alias of [RenderContext.renderChild] for workflows that don't take props.
