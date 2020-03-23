@@ -480,7 +480,7 @@ fun <PropsT, StateT, OutputT : Any, RenderingT>
     StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.workflowAction(
       name: () -> String,
       block: Mutator<StateT>.() -> OutputT?
-): WorkflowAction<StateT, OutputT> = object : WorkflowAction<StateT, OutputT> {
+    ): WorkflowAction<StateT, OutputT> = object : WorkflowAction<StateT, OutputT> {
   override fun Mutator<StateT>.apply() = block.invoke(this)
   override fun toString(): String = "workflowAction(${name()})-${this@workflowAction}"
 }
