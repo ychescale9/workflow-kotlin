@@ -19,7 +19,6 @@ import com.squareup.sample.timemachine.RecorderWorkflow.RecorderProps
 import com.squareup.sample.timemachine.RecorderWorkflow.RecorderProps.PlaybackAt
 import com.squareup.sample.timemachine.RecorderWorkflow.RecorderProps.RecordValue
 import com.squareup.sample.timemachine.RecorderWorkflow.Recording
-import com.squareup.workflow.RenderContext
 import com.squareup.workflow.Snapshot
 import com.squareup.workflow.StatefulWorkflow
 import kotlin.time.Duration
@@ -86,7 +85,7 @@ internal class RecorderWorkflow<T>(
   override fun render(
     props: RecorderProps<T>,
     state: Recording<T>,
-    context: RenderContext<Recording<T>, Nothing>
+    context: RenderContext
   ): TimeMachineRendering<T> {
     val value = when (props) {
       is RecordValue -> props.value

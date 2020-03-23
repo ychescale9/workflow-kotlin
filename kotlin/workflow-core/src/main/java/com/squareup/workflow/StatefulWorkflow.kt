@@ -21,6 +21,7 @@ import com.squareup.workflow.StatefulWorkflow.RenderContext
 import com.squareup.workflow.WorkflowAction.Companion.toString
 import com.squareup.workflow.WorkflowAction.Mutator
 import com.squareup.workflow.WorkflowAction.Updater
+import kotlinx.coroutines.channels.SendChannel
 
 /**
  * A composable, stateful object that can [handle events][RenderContext.actionSink],
@@ -70,7 +71,7 @@ import com.squareup.workflow.WorkflowAction.Updater
 abstract class StatefulWorkflow<
     in PropsT,
     StateT,
-    out OutputT : Any,
+    OutputT : Any,
     out RenderingT
     > : Workflow<PropsT, OutputT, RenderingT> {
 
@@ -126,7 +127,7 @@ abstract class StatefulWorkflow<
   abstract fun render(
     props: PropsT,
     state: StateT,
-    context: RenderContext<StateT, OutputT>
+    context: StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.RenderContext
   ): RenderingT
 
   /**
@@ -182,7 +183,7 @@ abstract class StatefulWorkflow<
    *
    * See [renderChild].
    */
-  abstract class RenderContext<StateT, in OutputT : Any> {
+  abstract inner class RenderContext {
 
     /**
      * Accepts a single [WorkflowAction], invokes that action by calling [WorkflowAction.apply]
@@ -248,6 +249,98 @@ abstract class StatefulWorkflow<
       handler: (T) -> WorkflowAction<StateT, OutputT>
     )
   }
+
+  interface Renderer<StateT, OutputT : Any> {
+    fun <ChildPropsT, ChildOutputT : Any, ChildRenderingT> render(
+      child: Workflow<ChildPropsT, ChildOutputT, ChildRenderingT>,
+      props: ChildPropsT,
+      key: String,
+      handler: (ChildOutputT) -> WorkflowAction<StateT, OutputT>
+    ): ChildRenderingT
+  }
+
+  interface WorkerRunner<StateT, OutputT : Any> {
+    fun <T> runningWorker(
+      worker: Worker<T>,
+      key: String,
+      handler: (T) -> WorkflowAction<StateT, OutputT>
+    )
+  }
+
+  /**
+   * An implementation of [RenderContext] that builds a [Behavior] via [freeze].
+   *
+   * Not for general application use.
+   */
+  inner class RealRenderContext(
+    private val renderer: Renderer<StateT, OutputT>,
+    private val workerRunner: WorkerRunner<StateT, OutputT>,
+    private val eventActionsChannel: SendChannel<WorkflowAction<StateT, OutputT>>
+  ) : RenderContext(), Sink<WorkflowAction<StateT, OutputT>> {
+
+    /**
+     * False during the current render call, set to true once this node is finished rendering.
+     *
+     * Used to:
+     *  - prevent modifications to this object after [freeze] is called.
+     *  - prevent sending to sinks before render returns.
+     */
+    private var frozen = false
+
+    override val actionSink: Sink<WorkflowAction<StateT, OutputT>> get() = this
+
+    @Suppress("OverridingDeprecatedMember")
+    override fun <EventT : Any> onEvent(handler: (EventT) -> WorkflowAction<StateT, OutputT>):
+        EventHandler<EventT> {
+      checkNotFrozen()
+      return EventHandler { event ->
+        // Run the handler synchronously, so we only have to emit the resulting action and don't
+        // need the update channel to be generic on each event type.
+        val action = handler(event)
+        eventActionsChannel.offer(action)
+      }
+    }
+
+    override fun send(value: WorkflowAction<StateT, OutputT>) {
+      if (!frozen) {
+        throw UnsupportedOperationException(
+            "Expected sink to not be sent to until after the render pass. Received action: $value"
+        )
+      }
+      eventActionsChannel.offer(value)
+    }
+
+    override fun <ChildPropsT, ChildOutputT : Any, ChildRenderingT> renderChild(
+      child: Workflow<ChildPropsT, ChildOutputT, ChildRenderingT>,
+      props: ChildPropsT,
+      key: String,
+      handler: (ChildOutputT) -> WorkflowAction<StateT, OutputT>
+    ): ChildRenderingT {
+      checkNotFrozen()
+      return renderer.render(child, props, key, handler)
+    }
+
+    override fun <T> runningWorker(
+      worker: Worker<T>,
+      key: String,
+      handler: (T) -> WorkflowAction<StateT, OutputT>
+    ) {
+      checkNotFrozen()
+      workerRunner.runningWorker(worker, key, handler)
+    }
+
+    /**
+     * Freezes this context so that any further calls to this context will throw.
+     */
+    fun freeze() {
+      checkNotFrozen()
+      frozen = true
+    }
+
+    private fun checkNotFrozen() = check(!frozen) {
+      "RenderContext cannot be used after render method returns."
+    }
+  }
 }
 
 /**
@@ -255,7 +348,7 @@ abstract class StatefulWorkflow<
  */
 inline fun <PropsT, StateT, OutputT : Any, RenderingT> Workflow.Companion.stateful(
   crossinline initialState: (PropsT, Snapshot?) -> StateT,
-  crossinline render: RenderContext<StateT, OutputT>.(props: PropsT, state: StateT) -> RenderingT,
+  crossinline render: StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.RenderContext.(props: PropsT, state: StateT) -> RenderingT,
   crossinline snapshot: (StateT) -> Snapshot,
   crossinline onPropsChanged: (
     old: PropsT,
@@ -278,7 +371,7 @@ inline fun <PropsT, StateT, OutputT : Any, RenderingT> Workflow.Companion.statef
     override fun render(
       props: PropsT,
       state: StateT,
-      context: RenderContext<StateT, OutputT>
+      context: StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.RenderContext
     ): RenderingT = render(context, props, state)
 
     override fun snapshotState(state: StateT): Snapshot = snapshot(state)
@@ -289,7 +382,7 @@ inline fun <PropsT, StateT, OutputT : Any, RenderingT> Workflow.Companion.statef
  */
 inline fun <StateT, OutputT : Any, RenderingT> Workflow.Companion.stateful(
   crossinline initialState: (Snapshot?) -> StateT,
-  crossinline render: RenderContext<StateT, OutputT>.(state: StateT) -> RenderingT,
+  crossinline render: StatefulWorkflow<*, StateT, OutputT, RenderingT>.RenderContext.(state: StateT) -> RenderingT,
   crossinline snapshot: (StateT) -> Snapshot
 ): StatefulWorkflow<Unit, StateT, OutputT, RenderingT> = stateful(
     { _, initialSnapshot -> initialState(initialSnapshot) },
@@ -304,7 +397,7 @@ inline fun <StateT, OutputT : Any, RenderingT> Workflow.Companion.stateful(
  */
 inline fun <PropsT, StateT, OutputT : Any, RenderingT> Workflow.Companion.stateful(
   crossinline initialState: (PropsT) -> StateT,
-  crossinline render: RenderContext<StateT, OutputT>.(props: PropsT, state: StateT) -> RenderingT,
+  crossinline render: StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.RenderContext.(props: PropsT, state: StateT) -> RenderingT,
   crossinline onPropsChanged: (
     old: PropsT,
     new: PropsT,
@@ -324,7 +417,7 @@ inline fun <PropsT, StateT, OutputT : Any, RenderingT> Workflow.Companion.statef
  */
 inline fun <StateT, OutputT : Any, RenderingT> Workflow.Companion.stateful(
   initialState: StateT,
-  crossinline render: RenderContext<StateT, OutputT>.(state: StateT) -> RenderingT
+  crossinline render: StatefulWorkflow<*, StateT, OutputT, RenderingT>.RenderContext.(state: StateT) -> RenderingT
 ): StatefulWorkflow<Unit, StateT, OutputT, RenderingT> = stateful(
     { initialState },
     { _, state -> render(state) }
@@ -340,9 +433,9 @@ inline fun <StateT, OutputT : Any, RenderingT> Workflow.Companion.stateful(
  */
 fun <PropsT, StateT, OutputT : Any, RenderingT>
     StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.action(
-      name: String = "",
-      update: Updater<StateT, OutputT>.() -> Unit
-    ) = action({ name }, update)
+  name: String = "",
+  update: Updater<StateT, OutputT>.() -> Unit
+) = action({ name }, update)
 
 /**
  * Convenience to create a [WorkflowAction] with parameter types matching those
@@ -355,9 +448,9 @@ fun <PropsT, StateT, OutputT : Any, RenderingT>
  */
 fun <PropsT, StateT, OutputT : Any, RenderingT>
     StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.action(
-      name: () -> String,
-      update: Updater<StateT, OutputT>.() -> Unit
-    ): WorkflowAction<StateT, OutputT> = object : WorkflowAction<StateT, OutputT> {
+  name: () -> String,
+  update: Updater<StateT, OutputT>.() -> Unit
+): WorkflowAction<StateT, OutputT> = object : WorkflowAction<StateT, OutputT> {
   override fun Updater<StateT, OutputT>.apply() = update.invoke(this)
   override fun toString(): String = "action(${name()})-${this@action}"
 }
@@ -371,9 +464,9 @@ fun <PropsT, StateT, OutputT : Any, RenderingT>
 )
 fun <PropsT, StateT, OutputT : Any, RenderingT>
     StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.workflowAction(
-      name: String = "",
-      block: Mutator<StateT>.() -> OutputT?
-    ) = workflowAction({ name }, block)
+  name: String = "",
+  block: Mutator<StateT>.() -> OutputT?
+) = workflowAction({ name }, block)
 
 @Suppress("OverridingDeprecatedMember")
 @Deprecated(
@@ -385,9 +478,9 @@ fun <PropsT, StateT, OutputT : Any, RenderingT>
 )
 fun <PropsT, StateT, OutputT : Any, RenderingT>
     StatefulWorkflow<PropsT, StateT, OutputT, RenderingT>.workflowAction(
-      name: () -> String,
-      block: Mutator<StateT>.() -> OutputT?
-    ): WorkflowAction<StateT, OutputT> = object : WorkflowAction<StateT, OutputT> {
+  name: () -> String,
+  block: Mutator<StateT>.() -> OutputT?
+): WorkflowAction<StateT, OutputT> = object : WorkflowAction<StateT, OutputT> {
   override fun Mutator<StateT>.apply() = block.invoke(this)
   override fun toString(): String = "workflowAction(${name()})-${this@workflowAction}"
 }

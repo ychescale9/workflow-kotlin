@@ -17,6 +17,7 @@ package com.squareup.workflow.internal
 
 import com.squareup.workflow.Snapshot
 import com.squareup.workflow.StatefulWorkflow
+import com.squareup.workflow.StatefulWorkflow.WorkerRunner
 import com.squareup.workflow.VeryExperimentalWorkflow
 import com.squareup.workflow.Worker
 import com.squareup.workflow.Workflow
@@ -25,7 +26,6 @@ import com.squareup.workflow.applyTo
 import com.squareup.workflow.diagnostic.IdCounter
 import com.squareup.workflow.diagnostic.WorkflowDiagnosticListener
 import com.squareup.workflow.diagnostic.createId
-import com.squareup.workflow.internal.RealRenderContext.WorkerRunner
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -225,7 +225,7 @@ internal class WorkflowNode<PropsT, StateT, OutputT : Any, RenderingT>(
   ): RenderingT {
     updatePropsAndState(workflow, props)
 
-    val context = RealRenderContext(
+    val context = workflow.RealRenderContext(
         renderer = subtreeManager,
         workerRunner = this,
         eventActionsChannel = eventActionsChannel

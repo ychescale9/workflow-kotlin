@@ -15,6 +15,7 @@
  */
 package com.squareup.workflow
 
+import com.squareup.workflow.StatefulWorkflow.RenderContext
 import com.squareup.workflow.WorkflowAction.Updater
 
 /**
@@ -34,13 +35,13 @@ import com.squareup.workflow.WorkflowAction.Updater
  *
  * @see StatefulWorkflow
  */
-abstract class StatelessWorkflow<in PropsT, out OutputT : Any, out RenderingT> :
+abstract class StatelessWorkflow<in PropsT, OutputT : Any, out RenderingT> :
     Workflow<PropsT, OutputT, RenderingT> {
 
   @Suppress("UNCHECKED_CAST")
   private val statefulWorkflow = Workflow.stateful<PropsT, Unit, OutputT, RenderingT>(
       initialState = { Unit },
-      render = { props, _ -> render(props, this as RenderContext<Nothing, OutputT>) }
+      render = { props, _ -> render(props, this) }
   )
 
   /**
@@ -59,7 +60,7 @@ abstract class StatelessWorkflow<in PropsT, out OutputT : Any, out RenderingT> :
    */
   abstract fun render(
     props: PropsT,
-    context: RenderContext<Nothing, OutputT>
+    context: StatefulWorkflow<PropsT, Unit, OutputT, RenderingT>.RenderContext
   ): RenderingT
 
   /**
@@ -81,12 +82,12 @@ abstract class StatelessWorkflow<in PropsT, out OutputT : Any, out RenderingT> :
  * their own internal state.
  */
 inline fun <PropsT, OutputT : Any, RenderingT> Workflow.Companion.stateless(
-  crossinline render: RenderContext<Nothing, OutputT>.(props: PropsT) -> RenderingT
+  crossinline render: StatefulWorkflow<PropsT, Unit, OutputT, RenderingT>.RenderContext.(props: PropsT) -> RenderingT
 ): Workflow<PropsT, OutputT, RenderingT> =
   object : StatelessWorkflow<PropsT, OutputT, RenderingT>() {
     override fun render(
       props: PropsT,
-      context: RenderContext<Nothing, OutputT>
+      context: StatefulWorkflow<PropsT, Unit, OutputT, RenderingT>.RenderContext
     ): RenderingT = render(context, props)
   }
 

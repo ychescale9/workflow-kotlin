@@ -16,6 +16,7 @@
 package com.squareup.workflow.internal
 
 import com.squareup.workflow.Snapshot
+import com.squareup.workflow.StatefulWorkflow.Renderer
 import com.squareup.workflow.Workflow
 import com.squareup.workflow.WorkflowAction
 import com.squareup.workflow.diagnostic.IdCounter
@@ -98,7 +99,7 @@ internal class SubtreeManager<StateT, OutputT : Any>(
   private val diagnosticListener: WorkflowDiagnosticListener? = null,
   private val idCounter: IdCounter? = null,
   private val workerContext: CoroutineContext = EmptyCoroutineContext
-) : RealRenderContext.Renderer<StateT, OutputT> {
+) : Renderer<StateT, OutputT> {
 
   /**
    * When this manager's node is restored from a snapshot, its children snapshots are extracted into

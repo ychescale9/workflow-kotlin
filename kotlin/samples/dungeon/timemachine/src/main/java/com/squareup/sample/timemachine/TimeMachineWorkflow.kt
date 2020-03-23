@@ -20,11 +20,11 @@ import com.squareup.sample.timemachine.RecorderWorkflow.RecorderProps.RecordValu
 import com.squareup.sample.timemachine.TimeMachineWorkflow.TimeMachineProps
 import com.squareup.sample.timemachine.TimeMachineWorkflow.TimeMachineProps.PlayingBackAt
 import com.squareup.sample.timemachine.TimeMachineWorkflow.TimeMachineProps.Recording
-import com.squareup.workflow.RenderContext
+import com.squareup.workflow.StatefulWorkflow
+import com.squareup.workflow.StatefulWorkflow.RenderContext
 import com.squareup.workflow.StatelessWorkflow
 import com.squareup.workflow.Workflow
 import com.squareup.workflow.action
-import com.squareup.workflow.renderChild
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
@@ -84,7 +84,7 @@ class TimeMachineWorkflow<P, O : Any, out R>(
 
   override fun render(
     props: TimeMachineProps<P>,
-    context: RenderContext<Nothing, O>
+    context: StatefulWorkflow<P, Unit, O, R>.RenderContext
   ): TimeMachineRendering<R> {
     // Always render the delegate, even if in playback mode, to keep it alive.
     val delegateRendering =
