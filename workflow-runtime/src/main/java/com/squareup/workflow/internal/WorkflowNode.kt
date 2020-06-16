@@ -25,6 +25,7 @@ import com.squareup.workflow.applyTo
 import com.squareup.workflow.diagnostic.IdCounter
 import com.squareup.workflow.diagnostic.WorkflowDiagnosticListener
 import com.squareup.workflow.diagnostic.createId
+import com.squareup.workflow.internal.RealRenderContext.SideEffectRunner
 import com.squareup.workflow.internal.RealRenderContext.WorkerRunner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
@@ -33,6 +34,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.selects.SelectBuilder
 import okio.ByteString
 import kotlin.coroutines.CoroutineContext
@@ -63,7 +66,7 @@ internal class WorkflowNode<PropsT, StateT, OutputT : Any, RenderingT>(
   private val idCounter: IdCounter? = null,
   initialState: StateT? = null,
   private val workerContext: CoroutineContext = EmptyCoroutineContext
-) : CoroutineScope, WorkerRunner<StateT, OutputT> {
+) : CoroutineScope, WorkerRunner<StateT, OutputT>, SideEffectRunner {
 
   /**
    * Context that has a job that will live as long as this node.
@@ -83,6 +86,8 @@ internal class WorkflowNode<PropsT, StateT, OutputT : Any, RenderingT>(
   )
 
   private val workers = ActiveStagingList<WorkerChildNode<*, *, *>>()
+
+  private val sideEffects = ActiveStagingList<SideEffectNode>()
 
   private var state: StateT
 
@@ -144,7 +149,7 @@ internal class WorkflowNode<PropsT, StateT, OutputT : Any, RenderingT>(
     key: String,
     handler: (T) -> WorkflowAction<StateT, OutputT>
   ) {
-    // Prevent duplicate workflows with the same key.
+    // Prevent duplicate workers with the same key.
     workers.forEachStaging {
       require(!(it.matches(worker, key))) {
         "Expected keys to be unique for $worker: key=$key"
@@ -157,6 +162,21 @@ internal class WorkflowNode<PropsT, StateT, OutputT : Any, RenderingT>(
         create = { createWorkerNode(worker, key, handler) }
     )
     stagedWorker.setHandler(handler)
+  }
+
+  override fun runningSideEffect(
+    key: String,
+    sideEffect: suspend () -> Unit
+  ) {
+    // Prevent duplicate side effects with the same key.
+    sideEffects.forEachStaging {
+      require(key != it.key) { "Expected side effect keys to be unique: $key" }
+    }
+
+    sideEffects.retainOrCreate(
+        predicate = { key == it.key },
+        create = { createSideEffectNode(key, sideEffect) }
+    )
   }
 
   /**
@@ -229,6 +249,7 @@ internal class WorkflowNode<PropsT, StateT, OutputT : Any, RenderingT>(
     val context = RealRenderContext(
         renderer = subtreeManager,
         workerRunner = this,
+        sideEffectRunner = this,
         eventActionsChannel = eventActionsChannel
     )
     diagnosticListener?.onBeforeWorkflowRendered(diagnosticId, props, state)
@@ -239,6 +260,7 @@ internal class WorkflowNode<PropsT, StateT, OutputT : Any, RenderingT>(
     // Tear down workflows and workers that are obsolete.
     subtreeManager.commitRenderedChildren()
     workers.commitStaging { it.channel.cancel() }
+    sideEffects.commitStaging { it.job.cancel() }
 
     return rendering
   }
@@ -280,6 +302,16 @@ internal class WorkflowNode<PropsT, StateT, OutputT : Any, RenderingT>(
     val workerChannel =
       launchWorker(worker, key, workerId, diagnosticId, diagnosticListener, workerContext)
     return WorkerChildNode(worker, key, workerChannel, handler = handler)
+  }
+
+  private fun createSideEffectNode(
+    key: String,
+    sideEffect: suspend () -> Unit
+  ): SideEffectNode {
+    // workerContext is guaranteed to not contain a Job.
+    val scope = this + CoroutineName("sideEffect:$key") + workerContext
+    val job = scope.launch { sideEffect() }
+    return SideEffectNode(key, job)
   }
 
   private fun ByteString.restoreState(): Snapshot? {

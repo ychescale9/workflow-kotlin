@@ -116,6 +116,14 @@ interface RenderContext<StateT, in OutputT : Any> {
     key: String = "",
     handler: (T) -> WorkflowAction<StateT, OutputT>
   )
+
+  /**
+   * TODO kdoc
+   */
+  fun runningSideEffect(
+    key: String,
+    sideEffect: suspend () -> Unit
+  )
 }
 
 /**
