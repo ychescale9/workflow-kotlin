@@ -13,22 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-plugins {
-  id("com.android.application")
-  kotlin("android")
-}
+package com.squareup.sample.helloworkflowfragment
 
-apply(from = rootProject.file(".buildscript/android-sample-app.gradle"))
-apply(from = rootProject.file(".buildscript/android-ui-tests.gradle"))
+import androidx.fragment.app.Fragment
 
-android {
-  defaultConfig {
-    applicationId = "com.squareup.sample.helloworkflowfragment"
-  }
-}
-
-dependencies {
-  implementation(project(":workflow-ui:core-android"))
-  implementation("androidx.navigation:navigation-fragment-ktx:2.2.2")
-  implementation("androidx.navigation:navigation-ui-ktx:2.2.2")
-}
+class SecondFragment : Fragment(R.layout.second_layout)

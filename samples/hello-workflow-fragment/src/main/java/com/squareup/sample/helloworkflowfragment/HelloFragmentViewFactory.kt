@@ -16,6 +16,7 @@
 package com.squareup.sample.helloworkflowfragment
 
 import android.annotation.SuppressLint
+import androidx.navigation.findNavController
 import com.squareup.sample.helloworkflowfragment.databinding.HelloGoodbyeLayoutBinding
 import com.squareup.workflow.ui.LayoutRunner
 import com.squareup.workflow.ui.ViewFactory
@@ -25,4 +26,7 @@ val HelloFragmentViewFactory: ViewFactory<HelloWorkflow.Rendering> =
     @SuppressLint("SetTextI18n")
     helloMessage.text = rendering.message + " Fragment!"
     helloMessage.setOnClickListener { rendering.onClick() }
+    button.setOnClickListener {
+      root.findNavController().navigate(R.id.action_helloFragment_to_secondFragment)
+    }
   }

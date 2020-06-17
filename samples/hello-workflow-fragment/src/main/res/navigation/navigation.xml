@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/navigation"
+    app:startDestination="@id/helloFragment">
+
+    <fragment
+        android:id="@+id/helloFragment"
+        android:name="com.squareup.sample.helloworkflowfragment.HelloWorkflowFragment">
+
+        <action
+            android:id="@+id/action_helloFragment_to_secondFragment"
+            app:destination="@id/secondFragment" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/secondFragment"
+        android:name="com.squareup.sample.helloworkflowfragment.SecondFragment" />
+
+</navigation>
