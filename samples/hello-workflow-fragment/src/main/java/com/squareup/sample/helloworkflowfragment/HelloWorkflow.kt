@@ -31,6 +31,7 @@ object HelloWorkflow : StatefulWorkflow<Unit, State, Nothing, Rendering>() {
   }
 
   data class Rendering(
+    val items: List<String>,
     val message: String,
     val onClick: () -> Unit
   )
@@ -39,7 +40,7 @@ object HelloWorkflow : StatefulWorkflow<Unit, State, Nothing, Rendering>() {
     props: Unit,
     snapshot: Snapshot?
   ): State = snapshot?.bytes?.parse { source -> if (source.readInt() == 1) Hello else Goodbye }
-      ?: Hello
+    ?: Hello
 
   override fun render(
     props: Unit,
@@ -47,8 +48,9 @@ object HelloWorkflow : StatefulWorkflow<Unit, State, Nothing, Rendering>() {
     context: RenderContext
   ): Rendering {
     return Rendering(
-        message = state.name,
-        onClick = { context.actionSink.send(helloAction) }
+      items = DUMMY_ITEMS,
+      message = state.name,
+      onClick = { context.actionSink.send(helloAction) }
     )
   }
 
@@ -61,3 +63,7 @@ object HelloWorkflow : StatefulWorkflow<Unit, State, Nothing, Rendering>() {
     }
   }
 }
+
+private val DUMMY_ITEMS = listOf(
+  "a", "b", "c", "d", "e", "f", "g"
+)

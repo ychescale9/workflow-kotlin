@@ -24,7 +24,9 @@ import com.squareup.workflow1.ui.WorkflowRunner
 
 @OptIn(WorkflowUiExperimentalApi::class)
 class HelloWorkflowFragment : WorkflowFragment<Unit, Nothing>() {
-  override val viewEnvironment = ViewEnvironment(ViewRegistry(HelloFragmentViewFactory))
+  override val viewEnvironment = ViewEnvironment(
+    ViewRegistry(HelloLayoutRunner)
+  )
 
   override fun onCreateWorkflow(): WorkflowRunner.Config<Unit, Nothing> {
     return WorkflowRunner.Config(
